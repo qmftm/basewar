@@ -6,10 +6,8 @@ import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.Particle;
@@ -243,8 +241,7 @@ public class GameManager {
         if (selected) {
             lore.add("");
             lore.add("§a▶ 선택됨");
-            meta.addEnchant(Enchantment.UNBREAKING, 1, true);
-            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            meta.setEnchantmentGlintOverride(true);
         }
         meta.setLore(lore);
         item.setItemMeta(meta);

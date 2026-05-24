@@ -1,0 +1,15 @@
+name: BaseWar
+version: 1.1.0
+main: com.example.basewar.BaseWarPlugin
+api-version: '1.21'
+author: Gemini
+commands:
+  bw:
+    description: 기지전쟁 게임을 관리합니다.
+    usage: /bw <start|stop|config|team>
+  팀채팅:
+    description: 팀 채팅 모드를 켜고 끕니다.
+    usage: /팀채팅
+  팀챗:
+    description: 팀 채팅 모드를 켜고 끕니다.
+    usage: /팀챗
