@@ -19,3 +19,12 @@ beacon-placement-restrictions:
   max-y: 256
   min-z: -1000
   max-z: 1000
+
+# 점령전 모드 설정
+conquest:
+  capture-radius: 15
+  capture-rate: 5.0
+
+# 하드코어 모드 설정
+hardcore:
+  revive-cost: 32

@@ -19,10 +19,14 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.block.Action;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
@@ -41,6 +45,30 @@ public class GameListener implements Listener {
     }
 
     @EventHandler
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getView().getTitle().equals(GameManager.HARDCORE_REVIVE_GUI_TITLE)) {
+            event.setCancelled(true);
+            ItemStack clicked = event.getCurrentItem();
+            if (clicked == null || clicked.getType() == org.bukkit.Material.BLACK_STAINED_GLASS_PANE) return;
+            gameManager.handleHardcoreReviveClick((Player) event.getWhoClicked(), clicked);
+            return;
+        }
+
+        if (!event.getView().getTitle().equals(GameManager.GAMEMODE_GUI_TITLE)) return;
+        event.setCancelled(true);
+
+        int slot = event.getRawSlot();
+        GameModeType mode = GameModeType.fromSlot(slot);
+        if (mode == null || mode == gameManager.getCurrentGameMode()) return;
+
+        gameManager.setCurrentGameMode(mode);
+        Player player = (Player) event.getWhoClicked();
+        // 선택 후 GUI 갱신
+        gameManager.openGameModeGui(player);
+        player.sendMessage("§a게임모드가 §f" + mode.getDisplayName() + "§a으로 설정되었습니다.");
+    }
+
+    @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
         if (event.getView().getTitle().equals(GameManager.KIT_GUI_TITLE)) {
             Player player = (Player) event.getPlayer();
@@ -56,6 +84,12 @@ public class GameListener implements Listener {
         if (!gameManager.isGameInProgress()) return;
 
         Player player = event.getPlayer();
+
+        if (player.getGameMode() == GameMode.SPECTATOR) {
+            event.setFormat("§7[관전] §f%1$s§f: %2$s");
+            return;
+        }
+
         Team team = gameManager.getPlayerTeam(player);
 
         if (gameManager.isTeamChatEnabled(player.getUniqueId())) {
@@ -96,6 +130,41 @@ public class GameListener implements Listener {
         if (gameManager.isGameInProgress() && gameManager.isInvincible() && gameManager.getInvincibilityBossBar() != null) {
             gameManager.getInvincibilityBossBar().addPlayer(player);
         }
+        // 재접속 시 점령전 보스바에 추가
+        if (gameManager.isGameInProgress() && gameManager.getCurrentGameMode() == GameModeType.CONQUEST) {
+            gameManager.addPlayerToConquestBossBars(player);
+        }
+        // 재접속 시 하드코어 사망 상태 복원
+        if (gameManager.isGameInProgress() && gameManager.getCurrentGameMode() == GameModeType.HARDCORE) {
+            gameManager.restoreHardcoreDeadState(player);
+        }
+        // 재접속 시 게임 관전 상태 복원 (회색 이름표)
+        if (gameManager.isGameInProgress() && gameManager.isGameSpectator(player.getUniqueId())) {
+            player.setDisplayName(org.bukkit.ChatColor.GRAY + player.getName() + org.bukkit.ChatColor.RESET);
+            player.setPlayerListName(org.bukkit.ChatColor.GRAY + "[관전] " + player.getName() + org.bukkit.ChatColor.RESET);
+        }
+    }
+
+    @EventHandler
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        if (!gameManager.isGameInProgress()) return;
+        if (gameManager.getCurrentGameMode() != GameModeType.HARDCORE) return;
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+
+        Block block = event.getClickedBlock();
+        if (block == null || block.getType() != Material.BEACON) return;
+
+        Player player = event.getPlayer();
+        if (player.getGameMode() == GameMode.SPECTATOR) return;
+
+        Team playerTeam = gameManager.getPlayerTeam(player);
+        if (playerTeam == null) return;
+
+        Location beaconLoc = gameManager.getBeaconLocations().get(playerTeam);
+        if (beaconLoc == null || !beaconLoc.equals(block.getLocation())) return;
+
+        event.setCancelled(true);
+        gameManager.openHardcoreReviveGui(player);
     }
 
     @EventHandler
@@ -110,7 +179,15 @@ public class GameListener implements Listener {
         if (!gameManager.isGameInProgress()) return;
         Player player = event.getEntity();
 
-        // 사망 화면이 뜨도록 하고, 아이템 드롭은 기본 동작에 맡김
+        // 하드코어: 신호기가 살아있으면 아이템 드롭 방지 (인벤 보호)
+        if (gameManager.getCurrentGameMode() == GameModeType.HARDCORE) {
+            Team team = gameManager.getPlayerTeam(player);
+            if (team != null && gameManager.getBeaconStatus().get(team)) {
+                event.getDrops().clear();
+                event.setDroppedExp(0);
+            }
+        }
+
         gameManager.handlePlayerDeath(player);
     }
 
@@ -119,6 +196,28 @@ public class GameListener implements Listener {
         if (!gameManager.isGameInProgress()) return;
         Player player = event.getPlayer();
         Team team = gameManager.getPlayerTeam(player);
+
+        // 하드코어: 부활 대기 상태이면 글로벌 스폰으로 보내고 관전 전환 예약
+        if (gameManager.getCurrentGameMode() == GameModeType.HARDCORE) {
+            if (gameManager.isHardcoreDead(player.getUniqueId())) {
+                Location globalSpawn = gameManager.getGlobalSpawnLocation();
+                if (globalSpawn != null) {
+                    event.setRespawnLocation(globalSpawn);
+                } else {
+                    event.setRespawnLocation(player.getWorld().getSpawnLocation());
+                }
+                gameManager.scheduleHardcoreSpectator(player);
+                return;
+            }
+            // 신호기 미설치 시: 글로벌 스폰으로 리스폰
+            Location globalSpawn = gameManager.getGlobalSpawnLocation();
+            if (globalSpawn != null) {
+                event.setRespawnLocation(globalSpawn);
+            } else {
+                event.setRespawnLocation(player.getWorld().getSpawnLocation());
+            }
+            return;
+        }
 
         // 비콘이 살아있으면 리스폰 대기시간 시작
         if (team != null && gameManager.getBeaconStatus().get(team)) {
@@ -289,9 +388,11 @@ public class GameListener implements Listener {
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
         if (!gameManager.isGameInProgress()) return;
 
-        // 무적 시간에는 모든 데미지 방지 (중복 체크지만 안전을 위해 추가)
+        // 무적 시간에는 플레이어에게 가해지는 데미지만 방지
         if (gameManager.isInvincible()) {
-            event.setCancelled(true);
+            if (event.getEntity() instanceof Player) {
+                event.setCancelled(true);
+            }
             return;
         }
 
@@ -370,9 +471,9 @@ public class GameListener implements Listener {
         if (!gameManager.isGameInProgress()) return;
         Player player = event.getPlayer();
 
-        // 관전 모드일 때 움직임 제한
-        if (player.getGameMode() == GameMode.SPECTATOR) {
-            // 플레이어가 블록을 이동했는지 확인 (시야만 움직이는 것은 허용)
+        // 탈락 관전자 이동 제한 (게임 관전자는 자유롭게 이동 허용)
+        if (player.getGameMode() == GameMode.SPECTATOR
+                && !gameManager.isGameSpectator(player.getUniqueId())) {
             if (event.getFrom().getBlockX() != event.getTo().getBlockX() ||
                 event.getFrom().getBlockY() != event.getTo().getBlockY() ||
                 event.getFrom().getBlockZ() != event.getTo().getBlockZ()) {

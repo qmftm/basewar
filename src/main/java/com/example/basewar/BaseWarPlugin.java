@@ -22,9 +22,12 @@ public class BaseWarPlugin extends JavaPlugin {
         BwCommand bwCommandExecutor = new BwCommand(gameManager);
         this.getCommand("bw").setExecutor(bwCommandExecutor);
         this.getCommand("bw").setTabCompleter(bwCommandExecutor);
-        JoinCommand joinCommandExecutor = new JoinCommand(gameManager);
-        this.getCommand("join").setExecutor(joinCommandExecutor);
-        this.getCommand("join").setTabCompleter(joinCommandExecutor);
+
+        // 팀 채팅 단축 명령어
+        for (String alias : new String[]{"팀채팅", "팀챗"}) {
+            org.bukkit.command.PluginCommand cmd = this.getCommand(alias);
+            if (cmd != null) cmd.setExecutor(bwCommandExecutor);
+        }
 
         // Register Event Listeners
         getServer().getPluginManager().registerEvents(new GameListener(gameManager), this);

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="com.obiscr.chatgpt.settings.EasyCodeState">
+    <option name="projectFiles" value="$PROJECT_DIR$/src/main/java/com/example/basewar/BaseWarPlugin.java;D:/1.Song(삭제하지마세요)/Documents/.files/plugins/basewar/src/main/java/com/example/basewar/BwCommand.java;D:/1.Song(삭제하지마세요)/Documents/.files/plugins/basewar/src/main/java/com/example/basewar/GameListener.java;D:/1.Song(삭제하지마세요)/Documents/.files/plugins/basewar/src/main/java/com/example/basewar/GameManager.java;D:/1.Song(삭제하지마세요)/Documents/.files/plugins/basewar/src/main/java/com/example/basewar/JoinCommand.java;D:/1.Song(삭제하지마세요)/Documents/.files/plugins/basewar/src/main/java/com/example/basewar/Team.java;D:/1.Song(삭제하지마세요)/Documents/.files/plugins/basewar/README.md" />
+  </component>
+</project>

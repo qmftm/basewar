@@ -5,8 +5,11 @@ api-version: '1.21'
 author: Gemini
 commands:
   bw:
-    description: 기지전쟁 게임을 관리합니다。
-    usage: /bw <start|stop>
-  join:
-    description: 원하는 팀에 참여합니다.
-    usage: /join <team>
+    description: 기지전쟁 게임을 관리합니다.
+    usage: /bw <start|stop|config|team>
+  팀채팅:
+    description: 팀 채팅 모드를 켜고 끕니다.
+    usage: /팀채팅
+  팀챗:
+    description: 팀 채팅 모드를 켜고 끕니다.
+    usage: /팀챗
